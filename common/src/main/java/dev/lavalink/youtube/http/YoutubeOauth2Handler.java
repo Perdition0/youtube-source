@@ -19,6 +19,8 @@ import org.apache.http.entity.StringEntity;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import dev.lavalink.youtube.db.MongoTokenProvider;
+import java.util.Collections;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -51,22 +53,29 @@ public class YoutubeOauth2Handler {
     }
 
     public void setRefreshToken(@Nullable String refreshToken, boolean skipInitialization) {
-        this.refreshToken = refreshToken;
+         List<String> tokens = MongoTokenProvider.getActiveTokens();
+        Collections.shuffle(tokens);  
+    for (String token : tokens) {
+        this.refreshToken = token;
         this.tokenExpires = System.currentTimeMillis();
         this.accessToken = null;
-
-        if (!DataFormatTools.isNullOrEmpty(refreshToken)) {
+        try {
             refreshAccessToken(true);
-
-            // if refreshAccessToken() fails, enabled will never be flipped, so we don't use
-            // oauth tokens erroneously.
+            MongoTokenProvider.updateLastUsed(token);
             enabled = true;
-            return;
+            return; // Success
+        } catch (IOException ex) {
+            if (ex.getMessage().contains("401")) {
+                MongoTokenProvider.markBanned(token);
+                log.warn("Token banned, trying next one...");
+            } else {
+                log.error("Failed to refresh token: ", ex);
+            }
         }
+    }
 
-        if (!skipInitialization) {
-            initializeAccessToken();
-        }
+    enabled = false; // No working token
+    log.error("No valid refresh token found in MongoDB.");
     }
 
     public boolean shouldRefreshAccessToken() {
@@ -192,36 +201,40 @@ public class YoutubeOauth2Handler {
      *              need to be refreshed yet.
      */
     public void refreshAccessToken(boolean force) {
-        log.debug("Refreshing access token (force: {})", force);
+       log.debug("Refreshing access token (force: {})", force);
 
-        if (DataFormatTools.isNullOrEmpty(refreshToken)) {
-            throw new IllegalStateException("Cannot fetch access token without a refresh token!");
-        }
-
-        if (!shouldRefreshAccessToken() && !force) {
-            log.debug("Access token does not need to be refreshed yet.");
-            return;
-        }
-
-        synchronized (this) {
-            if (DataFormatTools.isNullOrEmpty(refreshToken)) {
-                throw new IllegalStateException("Cannot fetch access token without a refresh token!");
-            }
-
-            if (!shouldRefreshAccessToken() && !force) {
+    synchronized (this) {
+        for (String token : MongoTokenProvider.getActiveTokens()) {
+            
+            if (!force && !shouldRefreshAccessToken()) {
                 log.debug("Access token does not need to be refreshed yet.");
                 return;
             }
 
             try {
-                JsonObject json = createNewAccessToken(refreshToken);
+                JsonObject json = createNewAccessToken(token);
+                this.refreshToken = token;
                 updateTokens(json);
-                log.info("YouTube access token refreshed successfully");
-                log.debug("YouTube access token is {} and refresh token is {}. Access token expires in {} seconds.", accessToken, refreshToken, json.getLong("expires_in"));
-            } catch (Exception e) {
-                throw e;
+                MongoTokenProvider.updateLastUsed(token);
+                log.info("✅ YouTube access token refreshed successfully using token ending in: {}...", token.substring(Math.max(0, token.length() - 5)));
+                return;
+            } catch (RuntimeException e) {
+                if (e.getMessage().contains("401") || e.getMessage().toLowerCase().contains("invalid_grant")) {
+                    MongoTokenProvider.markBanned(token);
+                    log.warn("❌ Token banned or invalid. Marked and skipping: {}", token);
+                } else {
+                    log.error("⚠️ Failed to refresh token {} due to error: {}", token, e.getMessage());
+                }
+            } catch (Exception ex) {
+                log.error("⚠️ General exception for token {}: {}", token, ex.getMessage());
             }
         }
+
+        this.accessToken = null;
+        this.tokenExpires = 0;
+        this.enabled = false;
+        log.error("❌ All refresh tokens failed. Lavalink cannot authenticate to YouTube.");
+    }
     }
 
 
