@@ -10,9 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MongoTokenProvider {
-    private static final String URI = "mongodb+srv://USERNAME:PASSWORD@cluster.mongodb.net";
-    private static final String DB_NAME = "lavalink";
-    private static final String COLLECTION = "tokens";
+    private static final String URI = System.getenv("MONGODB_URI");
+    private static final String DB_NAME = "YoutubeTokens";
+    private static final String COLLECTION = "tokenSchemas";
 
     public static List<String> getActiveTokens() {
         List<String> tokens = new ArrayList<>();
