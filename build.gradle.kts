@@ -10,7 +10,7 @@ val (gitVersion, release) = versionFromGit()
 logger.lifecycle("Version: $gitVersion (release: $release)")
 
 allprojects {
-    group = "dev.lavalink.youtube"
+    group = "com.github.Perdition0.youtube"
     // The plugin project is the only one that should not have a snapshot version since lavalink expects the jar name to be specific
     version = if (project.name == "plugin") {
         gitVersion.removeSuffix("-SNAPSHOT")
