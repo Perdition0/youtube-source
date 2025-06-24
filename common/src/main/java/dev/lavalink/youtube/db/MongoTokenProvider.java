@@ -10,7 +10,7 @@ import java.util.List;
 
 public class MongoTokenProvider {
     private static final String URI = System.getenv("MONGODB_URI");
-    private static final String DB_NAME = "YoutubeTokens";
+    private static final String DB_NAME = "YoutubeTokens"; 
     private static final String COLLECTION = "tokenSchemas";
 
     public static List<String> getActiveTokens() {
