@@ -13,7 +13,7 @@ base {
 
 dependencies {
     compileOnly(libs.lavaplayer.v1)
-
+    implementation("org.mongodb:mongodb-driver-sync:4.11.1")
     implementation(libs.rhino.engine)
     implementation(libs.nanojson)
     compileOnly(libs.slf4j)
