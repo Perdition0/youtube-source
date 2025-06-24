@@ -61,18 +61,18 @@ public class YoutubeOauth2Handler {
         this.tokenExpires = System.currentTimeMillis();
         this.accessToken = null;
         try {
-            refreshAccessToken(true);
-            MongoTokenProvider.updateLastUsed(token);
-            enabled = true;
-            return; // Success
-        } catch (IOException ex) {
-            if (ex.getMessage().contains("401")) {
-                MongoTokenProvider.markBanned(token);
-                log.warn("Token banned, trying next one...");
-            } else {
-                log.error("Failed to refresh token: ", ex);
-            }
-        }
+    refreshAccessToken(true);
+    MongoTokenProvider.updateLastUsed(token);
+    enabled = true;
+    return; // Success
+} catch (RuntimeException ex) {
+    if (ex.getMessage() != null && ex.getMessage().contains("401")) {
+        MongoTokenProvider.markBanned(token);
+        log.warn("Token banned, trying next one...");
+    } else {
+        log.error("Failed to refresh token: ", ex);
+    }
+}
     }
 
     enabled = false; // No working token
